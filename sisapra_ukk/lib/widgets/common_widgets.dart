@@ -62,8 +62,8 @@ class GradientButton extends StatelessWidget {
 // Modern Text Field
 class ModernTextField extends StatelessWidget {
   final String label;
-  final String hint;
-  final IconData icon;
+  final String? hint;
+  final IconData? icon;
   final TextEditingController controller;
   final bool obscureText;
   final Widget? suffixIcon;
@@ -74,8 +74,8 @@ class ModernTextField extends StatelessWidget {
   const ModernTextField({
     super.key,
     required this.label,
-    required this.hint,
-    required this.icon,
+    this.hint,
+    this.icon,
     required this.controller,
     this.obscureText = false,
     this.suffixIcon,
@@ -103,13 +103,15 @@ class ModernTextField extends StatelessWidget {
           obscureText: obscureText,
           maxLines: maxLines,
           maxLength: maxLength,
+          validator: validator,
           decoration: InputDecoration(
             hintText: hint,
-            prefixIcon: Icon(icon, color: AppColors.primary),
+            prefixIcon: icon != null
+                ? Icon(icon, color: AppColors.primary)
+                : null,
             suffixIcon: suffixIcon,
             counterText: '',
           ),
-          validator: validator,
         ),
       ],
     );

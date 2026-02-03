@@ -11,10 +11,12 @@ class SiswaScreen extends StatefulWidget {
   State<SiswaScreen> createState() => _SiswaScreenState();
 }
 
-class _SiswaScreenState extends State<SiswaScreen> with SingleTickerProviderStateMixin {
+class _SiswaScreenState extends State<SiswaScreen>
+    with SingleTickerProviderStateMixin {
   int _currentIndex = 0;
   User? _currentUser;
   late TabController _tabController;
+  final GlobalKey<_HistoriTabState> historyKey = GlobalKey<_HistoriTabState>();
 
   @override
   void initState() {
@@ -36,8 +38,12 @@ class _SiswaScreenState extends State<SiswaScreen> with SingleTickerProviderStat
         title: const Text('Konfirmasi'),
         content: const Text('Yakin ingin keluar?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Keluar')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Batal')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Keluar')),
         ],
       ),
     );
@@ -45,7 +51,8 @@ class _SiswaScreenState extends State<SiswaScreen> with SingleTickerProviderStat
     if (confirm == true && mounted) {
       await DataManager.logout();
       if (mounted) {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+        Navigator.pushReplacement(
+            context, MaterialPageRoute(builder: (_) => const LoginScreen()));
       }
     }
   }
@@ -84,12 +91,13 @@ class _SiswaScreenState extends State<SiswaScreen> with SingleTickerProviderStat
                 const SizedBox(height: 4),
                 Text(
                   _currentUser?.kelas ?? '',
-                  style: TextStyle(fontSize: 14, color: Colors.white.withOpacity(0.9)),
+                  style: TextStyle(
+                      fontSize: 14, color: Colors.white.withOpacity(0.9)),
                 ),
               ],
             ),
           ),
-          
+
           // Tab Bar
           Container(
             color: Colors.white,
@@ -101,18 +109,25 @@ class _SiswaScreenState extends State<SiswaScreen> with SingleTickerProviderStat
               labelColor: AppColors.primary,
               unselectedLabelColor: AppColors.textSecondary,
               tabs: const [
-                Tab(icon: Icon(Icons.add_circle_rounded), text: 'Kirim Aspirasi'),
+                Tab(
+                    icon: Icon(Icons.add_circle_rounded),
+                    text: 'Kirim Aspirasi'),
                 Tab(icon: Icon(Icons.history_rounded), text: 'Histori'),
               ],
             ),
           ),
-          
+
           Expanded(
             child: TabBarView(
               controller: _tabController,
               children: [
-                _FormTab(user: _currentUser),
-                _HistoriTab(userId: _currentUser?.id),
+                _FormTab(
+                    user: _currentUser,
+                    onSubmitted: () {
+                      historyKey.currentState?.refresh();
+                      _tabController.animateTo(1);
+                    }),
+                _HistoriTab(key: historyKey, userId: _currentUser?.id),
               ],
             ),
           ),
@@ -125,7 +140,8 @@ class _SiswaScreenState extends State<SiswaScreen> with SingleTickerProviderStat
 // Form Tab
 class _FormTab extends StatefulWidget {
   final User? user;
-  const _FormTab({this.user});
+  final VoidCallback? onSubmitted;
+  const _FormTab({this.user, this.onSubmitted});
 
   @override
   State<_FormTab> createState() => _FormTabState();
@@ -143,30 +159,38 @@ class _FormTabState extends State<_FormTab> {
 
     setState(() => _isSubmitting = true);
 
-    final aspirasi = Aspirasi(
-      id: DataManager.generateId(),
-      userId: widget.user!.id,
-      nama: widget.user!.nama,
-      kelas: widget.user!.kelas ?? '',
-      kategori: _selectedKategori!,
-      judul: _judulController.text.trim(),
-      deskripsi: _deskripsiController.text.trim(),
-      tanggal: DateTime.now(),
-      progres: 'Menunggu review admin',
-    );
+    try {
+      final aspirasi = Aspirasi(
+        id: DataManager.generateId(),
+        userId: widget.user!.id,
+        nama: widget.user!.nama,
+        kelas: widget.user!.kelas ?? '',
+        kategori: _selectedKategori!,
+        judul: _judulController.text.trim(),
+        deskripsi: _deskripsiController.text.trim(),
+        tanggal: DateTime.now(),
+        progres: 'Menunggu review admin',
+      );
 
-    await DataManager.addAspirasi(aspirasi);
+      await DataManager.addAspirasi(aspirasi);
 
-    setState(() {
-      _isSubmitting = false;
-      _selectedKategori = null;
-      _judulController.clear();
-      _deskripsiController.clear();
-    });
-
-    if (mounted) {
-      Helpers.showSnackBar(context, '✅ Aspirasi berhasil dikirim!');
-      _formKey.currentState!.reset();
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+          _selectedKategori = null;
+          _judulController.clear();
+          _deskripsiController.clear();
+        });
+        Helpers.showSnackBar(context, '✅ Aspirasi berhasil dikirim!');
+        _formKey.currentState!.reset();
+        widget.onSubmitted?.call();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        Helpers.showSnackBar(context, '❌ Gagal mengirim aspirasi: $e',
+            isError: true);
+      }
     }
   }
 
@@ -183,14 +207,18 @@ class _FormTabState extends State<_FormTab> {
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [AppColors.info.withOpacity(0.1), AppColors.primary.withOpacity(0.05)],
+                  colors: [
+                    AppColors.info.withOpacity(0.1),
+                    AppColors.primary.withOpacity(0.05)
+                  ],
                 ),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: AppColors.info.withOpacity(0.3)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.lightbulb_rounded, color: AppColors.info, size: 28),
+                  Icon(Icons.lightbulb_rounded,
+                      color: AppColors.info, size: 28),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -202,29 +230,32 @@ class _FormTabState extends State<_FormTab> {
               ),
             ),
             const SizedBox(height: 24),
-            
             DropdownButtonFormField<String>(
               value: _selectedKategori,
               decoration: const InputDecoration(
                 labelText: 'Kategori Sarana',
                 prefixIcon: Icon(Icons.category_rounded),
               ),
-              items: AppConstants.kategoris.map((k) => DropdownMenuItem(value: k, child: Text(k))).toList(),
+              items: AppConstants.kategoris
+                  .map((k) => DropdownMenuItem(value: k, child: Text(k)))
+                  .toList(),
               onChanged: (v) => setState(() => _selectedKategori = v),
               validator: (v) => v == null ? 'Pilih kategori' : null,
             ),
             const SizedBox(height: 20),
-            
             ModernTextField(
               label: 'Judul',
               hint: 'Ringkasan masalah',
               icon: Icons.title_rounded,
               controller: _judulController,
               maxLength: 100,
-              validator: (v) => v!.isEmpty ? 'Judul harus diisi' : v.length < 10 ? 'Minimal 10 karakter' : null,
+              validator: (v) => v!.isEmpty
+                  ? 'Judul harus diisi'
+                  : v.length < 10
+                      ? 'Minimal 10 karakter'
+                      : null,
             ),
             const SizedBox(height: 20),
-            
             ModernTextField(
               label: 'Deskripsi',
               hint: 'Jelaskan detail masalahnya',
@@ -232,10 +263,13 @@ class _FormTabState extends State<_FormTab> {
               controller: _deskripsiController,
               maxLines: 6,
               maxLength: 500,
-              validator: (v) => v!.isEmpty ? 'Deskripsi harus diisi' : v.length < 20 ? 'Minimal 20 karakter' : null,
+              validator: (v) => v!.isEmpty
+                  ? 'Deskripsi harus diisi'
+                  : v.length < 20
+                      ? 'Minimal 20 karakter'
+                      : null,
             ),
             const SizedBox(height: 32),
-            
             GradientButton(
               text: 'Kirim Aspirasi',
               icon: Icons.send_rounded,
@@ -252,7 +286,7 @@ class _FormTabState extends State<_FormTab> {
 // Histori Tab
 class _HistoriTab extends StatefulWidget {
   final String? userId;
-  const _HistoriTab({this.userId});
+  const _HistoriTab({super.key, this.userId});
 
   @override
   State<_HistoriTab> createState() => _HistoriTabState();
@@ -269,14 +303,22 @@ class _HistoriTabState extends State<_HistoriTab> {
   }
 
   Future<void> _loadData() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
+
     final all = await DataManager.getAspirasi();
+    if (!mounted) return;
+
     setState(() {
-      _aspirasi = all.where((a) => a.userId == widget.userId).toList()
+      _aspirasi = all
+          .where((a) => a.userId == widget.userId)
+          .toList()
         ..sort((a, b) => b.tanggal.compareTo(a.tanggal));
       _isLoading = false;
     });
   }
+
+  void refresh() => _loadData();
 
   @override
   Widget build(BuildContext context) {
@@ -291,7 +333,10 @@ class _HistoriTabState extends State<_HistoriTab> {
           children: [
             Icon(Icons.inbox_rounded, size: 100, color: Colors.grey.shade300),
             const SizedBox(height: 16),
-            Text('Belum ada aspirasi', style: TextStyle(fontSize: 16, color: AppColors.textSecondary)),
+            Text(
+              'Belum ada aspirasi',
+              style: TextStyle(fontSize: 16, color: AppColors.textSecondary),
+            ),
           ],
         ),
       );
@@ -339,34 +384,43 @@ class _HistoriTabState extends State<_HistoriTab> {
                 ),
               ),
               const SizedBox(height: 24),
-              
               Row(
                 children: [
                   Expanded(
                     child: Text(
                       a.judul,
-                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                          fontSize: 24, fontWeight: FontWeight.bold),
                     ),
                   ),
-                  StatusBadge(status: a.status),
+                  StatusBadge(
+                    status: a.progres ?? 'Menunggu',
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
-              
-              _infoRow(Icons.calendar_today_rounded, Helpers.formatDate(a.tanggal)),
+              _infoRow(
+                  Icons.calendar_today_rounded, Helpers.formatDate(a.tanggal)),
               _infoRow(Icons.category_rounded, a.kategori),
               const SizedBox(height: 24),
-              
               _section('Deskripsi', Icons.description_rounded, a.deskripsi),
-              
               if (a.umpanBalik != null && a.umpanBalik!.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                _section('Umpan Balik Admin', Icons.comment_rounded, a.umpanBalik!, color: AppColors.info),
+                _section(
+                  'Umpan Balik Admin',
+                  Icons.comment_rounded,
+                  a.umpanBalik!,
+                  color: AppColors.info,
+                ),
               ],
-              
               if (a.progres != null && a.progres!.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                _section('Progres', Icons.timeline_rounded, a.progres!, color: AppColors.success),
+                _section(
+                  'Progres',
+                  Icons.timeline_rounded,
+                  a.progres!,
+                  color: AppColors.success,
+                ),
               ],
             ],
           ),
@@ -394,7 +448,8 @@ class _HistoriTabState extends State<_HistoriTab> {
       decoration: BoxDecoration(
         color: (color ?? AppColors.textSecondary).withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: (color ?? AppColors.textSecondary).withOpacity(0.3)),
+        border: Border.all(
+            color: (color ?? AppColors.textSecondary).withOpacity(0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -403,7 +458,10 @@ class _HistoriTabState extends State<_HistoriTab> {
             children: [
               Icon(icon, size: 18, color: color ?? AppColors.textPrimary),
               const SizedBox(width: 8),
-              Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
+              Text(
+                title,
+                style: TextStyle(fontWeight: FontWeight.bold, color: color),
+              ),
             ],
           ),
           const SizedBox(height: 8),

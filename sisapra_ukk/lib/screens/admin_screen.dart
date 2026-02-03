@@ -44,10 +44,17 @@ class _AdminScreenState extends State<AdminScreen> {
 
   void _applyFilters() {
     _filteredAspirasi = _allAspirasi.where((a) {
-      if (_filterTanggal != null && a.tanggal.toIso8601String().split('T')[0] != _filterTanggal) return false;
-      if (_filterBulan != null && a.tanggal.toIso8601String().substring(0, 7) != _filterBulan) return false;
-      if (_filterSiswa != null && !a.nama.toLowerCase().contains(_filterSiswa!.toLowerCase())) return false;
-      if (_filterKategori != null && a.kategori != _filterKategori) return false;
+      if (_filterTanggal != null &&
+          a.tanggal.toIso8601String().split('T')[0] != _filterTanggal)
+        return false;
+      if (_filterBulan != null &&
+          a.tanggal.toIso8601String().substring(0, 7) != _filterBulan)
+        return false;
+      if (_filterSiswa != null &&
+          !a.nama.toLowerCase().contains(_filterSiswa!.toLowerCase()))
+        return false;
+      if (_filterKategori != null && a.kategori != _filterKategori)
+        return false;
       return true;
     }).toList();
   }
@@ -70,8 +77,12 @@ class _AdminScreenState extends State<AdminScreen> {
         title: const Text('Konfirmasi'),
         content: const Text('Yakin ingin keluar?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Keluar')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Batal')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Keluar')),
         ],
       ),
     );
@@ -79,7 +90,8 @@ class _AdminScreenState extends State<AdminScreen> {
     if (confirm == true && mounted) {
       await DataManager.logout();
       if (mounted) {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+        Navigator.pushReplacement(
+            context, MaterialPageRoute(builder: (_) => const LoginScreen()));
       }
     }
   }
@@ -87,7 +99,8 @@ class _AdminScreenState extends State<AdminScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: ModernAppBar(title: 'Admin - ${AppConstants.appName}', onLogout: _logout),
+      appBar: ModernAppBar(
+          title: 'Admin - ${AppConstants.appName}', onLogout: _logout),
       body: Column(
         children: [
           // Admin Header
@@ -118,7 +131,8 @@ class _AdminScreenState extends State<AdminScreen> {
                 const SizedBox(height: 4),
                 Text(
                   'Administrator',
-                  style: TextStyle(fontSize: 14, color: Colors.white.withOpacity(0.9)),
+                  style: TextStyle(
+                      fontSize: 14, color: Colors.white.withOpacity(0.9)),
                 ),
               ],
             ),
@@ -133,18 +147,23 @@ class _AdminScreenState extends State<AdminScreen> {
                 Expanded(
                   child: Text(
                     'Total: ${_filteredAspirasi.length} aspirasi',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                 ),
-                if (_filterTanggal != null || _filterBulan != null || 
-                    _filterSiswa != null || _filterKategori != null)
+                if (_filterTanggal != null ||
+                    _filterBulan != null ||
+                    _filterSiswa != null ||
+                    _filterKategori != null)
                   IconButton(
                     icon: const Icon(Icons.clear_all_rounded),
                     onPressed: _clearFilters,
                     tooltip: 'Clear Filters',
                   ),
                 IconButton(
-                  icon: Icon(_showFilters ? Icons.filter_list_off_rounded : Icons.filter_list_rounded),
+                  icon: Icon(_showFilters
+                      ? Icons.filter_list_off_rounded
+                      : Icons.filter_list_rounded),
                   onPressed: () => setState(() => _showFilters = !_showFilters),
                   tooltip: 'Filter',
                 ),
@@ -164,9 +183,13 @@ class _AdminScreenState extends State<AdminScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.inbox_rounded, size: 100, color: Colors.grey.shade300),
+                            Icon(Icons.inbox_rounded,
+                                size: 100, color: Colors.grey.shade300),
                             const SizedBox(height: 16),
-                            Text('Tidak ada aspirasi', style: TextStyle(fontSize: 16, color: AppColors.textSecondary)),
+                            Text('Tidak ada aspirasi',
+                                style: TextStyle(
+                                    fontSize: 16,
+                                    color: AppColors.textSecondary)),
                           ],
                         ),
                       )
@@ -204,7 +227,8 @@ class _AdminScreenState extends State<AdminScreen> {
             children: [
               Icon(Icons.filter_alt_rounded, color: AppColors.primary),
               SizedBox(width: 8),
-              Text('Filter Data', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text('Filter Data',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             ],
           ),
           const SizedBox(height: 16),
@@ -215,10 +239,12 @@ class _AdminScreenState extends State<AdminScreen> {
               labelText: 'Per Tanggal',
               prefixIcon: const Icon(Icons.calendar_today_rounded),
               suffixIcon: _filterTanggal != null
-                  ? IconButton(icon: const Icon(Icons.clear), onPressed: () => setState(() {
-                      _filterTanggal = null;
-                      _applyFilters();
-                    }))
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () => setState(() {
+                            _filterTanggal = null;
+                            _applyFilters();
+                          }))
                   : null,
             ),
             readOnly: true,
@@ -246,10 +272,12 @@ class _AdminScreenState extends State<AdminScreen> {
               labelText: 'Per Bulan',
               prefixIcon: const Icon(Icons.calendar_month_rounded),
               suffixIcon: _filterBulan != null
-                  ? IconButton(icon: const Icon(Icons.clear), onPressed: () => setState(() {
-                      _filterBulan = null;
-                      _applyFilters();
-                    }))
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () => setState(() {
+                            _filterBulan = null;
+                            _applyFilters();
+                          }))
                   : null,
             ),
             readOnly: true,
@@ -277,10 +305,12 @@ class _AdminScreenState extends State<AdminScreen> {
               labelText: 'Nama Siswa',
               prefixIcon: const Icon(Icons.person_search_rounded),
               suffixIcon: _filterSiswa != null
-                  ? IconButton(icon: const Icon(Icons.clear), onPressed: () => setState(() {
-                      _filterSiswa = null;
-                      _applyFilters();
-                    }))
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () => setState(() {
+                            _filterSiswa = null;
+                            _applyFilters();
+                          }))
                   : null,
             ),
             onChanged: (v) => setState(() {
@@ -300,7 +330,8 @@ class _AdminScreenState extends State<AdminScreen> {
             ),
             items: [
               const DropdownMenuItem(value: null, child: Text('Semua')),
-              ...AppConstants.kategoris.map((k) => DropdownMenuItem(value: k, child: Text(k))),
+              ...AppConstants.kategoris
+                  .map((k) => DropdownMenuItem(value: k, child: Text(k))),
             ],
             onChanged: (v) => setState(() {
               _filterKategori = v;
@@ -353,7 +384,7 @@ class _UmpanBalikFormState extends State<_UmpanBalikForm> {
   void initState() {
     super.initState();
     _umpanBalikController.text = widget.aspirasi.umpanBalik ?? '';
-    _progresController.text = widget.aspirasi.progres ?? '';
+    _progresController.text = widget.aspirasi.progres;
     _selectedStatus = widget.aspirasi.status;
   }
 
@@ -417,15 +448,18 @@ class _UmpanBalikFormState extends State<_UmpanBalikForm> {
                   children: [
                     Text(
                       widget.aspirasi.judul,
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 12),
                     _infoRow('Nama', widget.aspirasi.nama),
                     _infoRow('Kelas', widget.aspirasi.kelas),
                     _infoRow('Kategori', widget.aspirasi.kategori),
-                    _infoRow('Tanggal', Helpers.formatDate(widget.aspirasi.tanggal)),
+                    _infoRow(
+                        'Tanggal', Helpers.formatDate(widget.aspirasi.tanggal)),
                     const SizedBox(height: 12),
-                    Text(widget.aspirasi.deskripsi, style: const TextStyle(fontSize: 14)),
+                    Text(widget.aspirasi.deskripsi,
+                        style: const TextStyle(fontSize: 14)),
                   ],
                 ),
               ),
@@ -457,7 +491,11 @@ class _UmpanBalikFormState extends State<_UmpanBalikForm> {
                 controller: _umpanBalikController,
                 maxLines: 5,
                 maxLength: 500,
-                validator: (v) => v!.isEmpty ? 'Harus diisi' : v.length < 10 ? 'Min 10 karakter' : null,
+                validator: (v) => v!.isEmpty
+                    ? 'Harus diisi'
+                    : v.length < 10
+                        ? 'Min 10 karakter'
+                        : null,
               ),
               const SizedBox(height: 20),
 
@@ -469,7 +507,11 @@ class _UmpanBalikFormState extends State<_UmpanBalikForm> {
                 controller: _progresController,
                 maxLines: 3,
                 maxLength: 300,
-                validator: (v) => v!.isEmpty ? 'Harus diisi' : v.length < 10 ? 'Min 10 karakter' : null,
+                validator: (v) => v!.isEmpty
+                    ? 'Harus diisi'
+                    : v.length < 10
+                        ? 'Min 10 karakter'
+                        : null,
               ),
               const SizedBox(height: 32),
 
@@ -495,7 +537,8 @@ class _UmpanBalikFormState extends State<_UmpanBalikForm> {
             width: 70,
             child: Text(
               '$label:',
-              style: TextStyle(fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+              style: TextStyle(
+                  fontWeight: FontWeight.w500, color: AppColors.textSecondary),
             ),
           ),
           Expanded(child: Text(value)),
