@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "921914922646",
+    "project_id": "sisapraukk",
+    "storage_bucket": "sisapraukk.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:921914922646:android:14c3d50409fd7eae2354b7",
+        "android_client_info": {
+          "package_name": "com.example.sisapra_ukk"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCWE7tQGUuzvHDD5E1PAyrpVT1hq3ftT2Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

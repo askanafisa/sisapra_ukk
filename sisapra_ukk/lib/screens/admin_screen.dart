@@ -1,8 +1,35 @@
 import 'package:flutter/material.dart';
 import '../app/theme.dart';
-import '../app/data.dart';
+import '../app/data.dart' hide AppConstants, AppColors, Helpers;
 import '../widgets/common_widgets.dart';
 import 'login_screen.dart';
+
+// ============================================================================
+// ADMIN SCREEN - KELOLA ASPIRASI DENGAN FITUR SEARCH
+// ============================================================================
+// 
+// ✅ FITUR BARU YANG DITAMBAHKAN:
+// 1. Search bar untuk cari aspirasi (judul, nama siswa, deskripsi, kategori)
+// 2. Highlight text yang match dengan query pencarian
+// 3. Sort otomatis berdasarkan relevansi
+// 4. Empty state khusus untuk hasil pencarian
+// 5. Info hasil pencarian di header
+//
+// ✅ FITUR LAMA YANG TETAP ADA:
+// - Filter tanggal, bulan, nama siswa, kategori
+// - Hapus aspirasi dengan konfirmasi
+// - Edit/umpan balik aspirasi
+// - Refresh data
+// - Logout
+//
+// CARA KERJA SEARCH:
+// 1. User ketik di search bar
+// 2. Sistem tunggu 500ms (debouncing)
+// 3. Filter aspirasi berdasarkan query
+// 4. Tampilkan hasil dengan highlight pada text yang match
+// 5. Bisa dikombinasikan dengan filter lain
+//
+// ============================================================================
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -18,7 +45,13 @@ class _AdminScreenState extends State<AdminScreen> {
   bool _isLoading = true;
   bool _showFilters = false;
 
-  // Filters
+  // ========================================
+  // ✅ TAMBAH: Variabel untuk SEARCH
+  // ========================================
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = ''; // Query pencarian
+
+  // Filters (yang sudah ada)
   String? _filterTanggal;
   String? _filterBulan;
   String? _filterSiswa;
@@ -28,6 +61,12 @@ class _AdminScreenState extends State<AdminScreen> {
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose(); // ✅ TAMBAH
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -42,8 +81,28 @@ class _AdminScreenState extends State<AdminScreen> {
     });
   }
 
+  // ========================================
+  // ✅ EDIT: Fungsi filter DENGAN SEARCH
+  // ========================================
   void _applyFilters() {
     _filteredAspirasi = _allAspirasi.where((a) {
+      // FILTER 1: Search Query (BARU!)
+      if (_searchQuery.isNotEmpty) {
+        final query = _searchQuery.toLowerCase();
+        final judul = a.judul.toLowerCase();
+        final nama = a.nama.toLowerCase();
+        final deskripsi = a.deskripsi.toLowerCase();
+        final kategori = a.kategori.toLowerCase();
+        
+        if (!judul.contains(query) && 
+            !nama.contains(query) && 
+            !deskripsi.contains(query) &&
+            !kategori.contains(query)) {
+          return false;
+        }
+      }
+
+      // FILTER 2-5: Filter lama
       if (_filterTanggal != null &&
           a.tanggal.toIso8601String().split('T')[0] != _filterTanggal)
         return false;
@@ -57,16 +116,115 @@ class _AdminScreenState extends State<AdminScreen> {
         return false;
       return true;
     }).toList();
+
+    // ✅ TAMBAH: Sort berdasarkan relevansi
+    if (_searchQuery.isNotEmpty) {
+      _filteredAspirasi.sort((a, b) {
+        final query = _searchQuery.toLowerCase();
+        final judulA = a.judul.toLowerCase();
+        final judulB = b.judul.toLowerCase();
+        
+        final aStartsWith = judulA.startsWith(query);
+        final bStartsWith = judulB.startsWith(query);
+        
+        if (aStartsWith && !bStartsWith) return -1;
+        if (!aStartsWith && bStartsWith) return 1;
+        return b.tanggal.compareTo(a.tanggal);
+      });
+    }
   }
 
+  // ✅ EDIT: Clear termasuk search
   void _clearFilters() {
     setState(() {
+      _searchQuery = '';
+      _searchController.clear();
       _filterTanggal = null;
       _filterBulan = null;
       _filterSiswa = null;
       _filterKategori = null;
       _applyFilters();
     });
+  }
+
+  // ========================================
+  // ✅ TAMBAH: Fungsi Highlight
+  // ========================================
+  List<TextSpan> _highlightText(String text, String query) {
+    if (query.isEmpty) {
+      return [TextSpan(text: text)];
+    }
+
+    final spans = <TextSpan>[];
+    final textLower = text.toLowerCase();
+    final queryLower = query.toLowerCase();
+    
+    int start = 0;
+    int indexOfMatch;
+    
+    while ((indexOfMatch = textLower.indexOf(queryLower, start)) != -1) {
+      if (indexOfMatch > start) {
+        spans.add(TextSpan(text: text.substring(start, indexOfMatch)));
+      }
+      
+      spans.add(TextSpan(
+        text: text.substring(indexOfMatch, indexOfMatch + query.length),
+        style: TextStyle(
+          color: AppColors.primary,
+          backgroundColor: AppColors.primary.withOpacity(0.2),
+          fontWeight: FontWeight.bold,
+        ),
+      ));
+      
+      start = indexOfMatch + query.length;
+    }
+    
+    if (start < text.length) {
+      spans.add(TextSpan(text: text.substring(start)));
+    }
+    
+    return spans;
+  }
+
+  Future<void> _confirmDelete(Aspirasi aspirasi) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Konfirmasi Hapus'),
+        content: Text('Yakin ingin menghapus aspirasi "${aspirasi.judul}"? Tindakan ini tidak dapat dibatalkan.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Hapus', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      setState(() => _isLoading = true);
+      final success = await DataManager.deleteAspirasi(aspirasi.id);
+      
+      if (mounted) {
+        setState(() => _isLoading = false);
+        
+        if (success) {
+          await _loadData();
+          Helpers.showSnackBar(context, '✅ Aspirasi berhasil dihapus!');
+        } else {
+          Helpers.showSnackBar(
+            context, 
+            '❌ Gagal menghapus aspirasi', 
+            isError: true
+          );
+        }
+      }
+    }
   }
 
   Future<void> _logout() async {
@@ -96,6 +254,72 @@ class _AdminScreenState extends State<AdminScreen> {
     }
   }
 
+  // ========================================
+  // ✅ TAMBAH: Widget Search Bar
+  // ========================================
+  Widget _buildSearchBar() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (value) {
+          // Debouncing: tunggu 500ms
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (value == _searchController.text) {
+              setState(() {
+                _searchQuery = value;
+                _applyFilters();
+              });
+            }
+          });
+        },
+        decoration: InputDecoration(
+          hintText: 'Cari judul, nama siswa, deskripsi...',
+          hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+          prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
+          suffixIcon: _searchController.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear, size: 20),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() {
+                      _searchQuery = '';
+                      _applyFilters();
+                    });
+                  },
+                )
+              : null,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey[300]!),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey[300]!),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppColors.primary, width: 2),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          filled: true,
+          fillColor: Colors.white,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -103,7 +327,7 @@ class _AdminScreenState extends State<AdminScreen> {
           title: 'Admin - ${AppConstants.appName}', onLogout: _logout),
       body: Column(
         children: [
-          // Admin Header
+          // Header
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(24),
@@ -138,23 +362,41 @@ class _AdminScreenState extends State<AdminScreen> {
             ),
           ),
 
+          // ✅ TAMBAH: Search Bar
+          _buildSearchBar(),
+
           // Filter Controls
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             color: Colors.white,
             child: Row(
               children: [
                 Expanded(
-                  child: Text(
-                    'Total: ${_filteredAspirasi.length} aspirasi',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Total: ${_filteredAspirasi.length} aspirasi',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      if (_searchQuery.isNotEmpty)
+                        Text(
+                          'Hasil pencarian: "$_searchQuery"',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 if (_filterTanggal != null ||
                     _filterBulan != null ||
                     _filterSiswa != null ||
-                    _filterKategori != null)
+                    _filterKategori != null ||
+                    _searchQuery.isNotEmpty)
                   IconButton(
                     icon: const Icon(Icons.clear_all_rounded),
                     onPressed: _clearFilters,
@@ -171,7 +413,6 @@ class _AdminScreenState extends State<AdminScreen> {
             ),
           ),
 
-          // Filters Section
           if (_showFilters) _buildFilterSection(),
 
           // List
@@ -183,13 +424,30 @@ class _AdminScreenState extends State<AdminScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.inbox_rounded,
-                                size: 100, color: Colors.grey.shade300),
+                            Icon(
+                              _searchQuery.isNotEmpty 
+                                  ? Icons.search_off
+                                  : Icons.inbox_rounded,
+                              size: 100, 
+                              color: Colors.grey.shade300
+                            ),
                             const SizedBox(height: 16),
-                            Text('Tidak ada aspirasi',
-                                style: TextStyle(
-                                    fontSize: 16,
-                                    color: AppColors.textSecondary)),
+                            Text(
+                              _searchQuery.isNotEmpty
+                                  ? 'Tidak ada hasil untuk "$_searchQuery"'
+                                  : 'Tidak ada aspirasi',
+                              style: TextStyle(
+                                  fontSize: 16,
+                                  color: AppColors.textSecondary),
+                            ),
+                            if (_searchQuery.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              ElevatedButton.icon(
+                                onPressed: _clearFilters,
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Reset Pencarian'),
+                              ),
+                            ],
                           ],
                         ),
                       )
@@ -198,15 +456,145 @@ class _AdminScreenState extends State<AdminScreen> {
                         child: ListView.builder(
                           padding: const EdgeInsets.all(20),
                           itemCount: _filteredAspirasi.length,
-                          itemBuilder: (context, i) => AspirasiCard(
-                            aspirasi: _filteredAspirasi[i],
-                            showUser: true,
-                            onTap: () => _showUmpanBalik(_filteredAspirasi[i]),
-                          ),
+                          itemBuilder: (context, i) {
+                            // ✅ EDIT: Gunakan card dengan highlight
+                            if (_searchQuery.isNotEmpty) {
+                              return _buildCardWithHighlight(_filteredAspirasi[i]);
+                            }
+                            return AspirasiCard(
+                              aspirasi: _filteredAspirasi[i],
+                              showUser: true,
+                              showMenu: true,
+                              onTap: () => _showUmpanBalik(_filteredAspirasi[i]),
+                              onEdit: () => _showUmpanBalik(_filteredAspirasi[i]),
+                              onDelete: () => _confirmDelete(_filteredAspirasi[i]),
+                            );
+                          },
                         ),
                       ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ✅ TAMBAH: Card dengan highlight
+  Widget _buildCardWithHighlight(Aspirasi a) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => _showUmpanBalik(a),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: RichText(
+                      text: TextSpan(
+                        children: _highlightText(a.judul, _searchQuery),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ),
+                  ),
+                  StatusBadge(status: a.status),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.person, size: 16, color: AppColors.textSecondary),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: RichText(
+                      text: TextSpan(
+                        children: _highlightText(a.nama, _searchQuery),
+                        style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  const Icon(Icons.category, size: 16, color: AppColors.textSecondary),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: RichText(
+                      text: TextSpan(
+                        children: _highlightText(a.kategori, _searchQuery),
+                        style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              RichText(
+                text: TextSpan(
+                  children: _highlightText(
+                    a.deskripsi.length > 100 ? '${a.deskripsi.substring(0, 100)}...' : a.deskripsi,
+                    _searchQuery,
+                  ),
+                  style: const TextStyle(fontSize: 13, color: Colors.black87),
+                ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
+                  const SizedBox(width: 4),
+                  Text(
+                    Helpers.formatDate(a.tanggal),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                  const Spacer(),
+                  PopupMenuButton(
+                    icon: const Icon(Icons.more_vert, size: 20),
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit, size: 18),
+                            SizedBox(width: 8),
+                            Text('Edit'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete, size: 18, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('Hapus', style: TextStyle(color: Colors.red)),
+                          ],
+                        ),
+                      ),
+                    ],
+                    onSelected: (value) {
+                      if (value == 'edit') _showUmpanBalik(a);
+                      else if (value == 'delete') _confirmDelete(a);
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -233,7 +621,6 @@ class _AdminScreenState extends State<AdminScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Tanggal
           TextField(
             decoration: InputDecoration(
               labelText: 'Per Tanggal',
@@ -266,7 +653,6 @@ class _AdminScreenState extends State<AdminScreen> {
           ),
           const SizedBox(height: 12),
 
-          // Bulan
           TextField(
             decoration: InputDecoration(
               labelText: 'Per Bulan',
@@ -299,7 +685,6 @@ class _AdminScreenState extends State<AdminScreen> {
           ),
           const SizedBox(height: 12),
 
-          // Nama Siswa
           TextField(
             decoration: InputDecoration(
               labelText: 'Nama Siswa',
@@ -321,7 +706,6 @@ class _AdminScreenState extends State<AdminScreen> {
           ),
           const SizedBox(height: 12),
 
-          // Kategori
           DropdownButtonFormField<String>(
             value: _filterKategori,
             decoration: const InputDecoration(
@@ -436,7 +820,6 @@ class _UmpanBalikFormState extends State<_UmpanBalikForm> {
               ),
               const SizedBox(height: 24),
 
-              // Detail Aspirasi
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -465,7 +848,6 @@ class _UmpanBalikFormState extends State<_UmpanBalikForm> {
               ),
               const SizedBox(height: 24),
 
-              // Status
               DropdownButtonFormField<String>(
                 value: _selectedStatus,
                 decoration: const InputDecoration(
@@ -483,7 +865,6 @@ class _UmpanBalikFormState extends State<_UmpanBalikForm> {
               ),
               const SizedBox(height: 20),
 
-              // Umpan Balik
               ModernTextField(
                 label: 'Umpan Balik',
                 hint: 'Berikan tanggapan...',
@@ -499,7 +880,6 @@ class _UmpanBalikFormState extends State<_UmpanBalikForm> {
               ),
               const SizedBox(height: 20),
 
-              // Progres
               ModernTextField(
                 label: 'Progres',
                 hint: 'Update progres perbaikan...',

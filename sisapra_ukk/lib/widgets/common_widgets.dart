@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../app/theme.dart';
-import '../app/data.dart';
+import '../app/data.dart' hide AppColors, Helpers;
 
 // Modern Gradient Button
 class GradientButton extends StatelessWidget {
@@ -121,8 +121,15 @@ class ModernTextField extends StatelessWidget {
 // Status Badge Modern
 class StatusBadge extends StatelessWidget {
   final String status;
+  final bool showEditIcon; // ✅ TAMBAH: Parameter untuk edit icon
+  final VoidCallback? onEditPressed; // ✅ TAMBAH: Callback edit
 
-  const StatusBadge({super.key, required this.status});
+  const StatusBadge({
+    super.key, 
+    required this.status,
+    this.showEditIcon = false, // ✅ TAMBAH: Default false
+    this.onEditPressed, // ✅ TAMBAH: Callback edit
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -152,6 +159,23 @@ class StatusBadge extends StatelessWidget {
               letterSpacing: 0.5,
             ),
           ),
+          
+          // ✅ TAMBAH: Edit icon untuk siswa jika status pending
+          if (showEditIcon && (status.toLowerCase() == 'pending' || status.toLowerCase() == 'menunggu')) ...[
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: onEditPressed,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.edit_rounded, 
+                    size: 12, color: Colors.blue),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -163,12 +187,18 @@ class AspirasiCard extends StatelessWidget {
   final Aspirasi aspirasi;
   final VoidCallback? onTap;
   final bool showUser;
+  final bool showMenu; // ✅ TAMBAH: Parameter untuk menu
+  final VoidCallback? onEdit; // ✅ TAMBAH: Callback edit
+  final VoidCallback? onDelete; // ✅ TAMBAH: Callback delete
 
   const AspirasiCard({
     super.key,
     required this.aspirasi,
     this.onTap,
     this.showUser = false,
+    this.showMenu = false, // ✅ TAMBAH: Default false
+    this.onEdit, // ✅ TAMBAH: Callback edit
+    this.onDelete, // ✅ TAMBAH: Callback delete
   });
 
   @override
@@ -215,7 +245,51 @@ class AspirasiCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    StatusBadge(status: aspirasi.status),
+                    StatusBadge(
+                      status: aspirasi.status,
+                      showEditIcon: showUser && (aspirasi.status.toLowerCase() == 'pending'), // ✅ EDIT: Hanya siswa bisa edit status pending
+                      onEditPressed: onEdit, // ✅ EDIT: Pass callback
+                    ),
+                    
+                    // ✅ TAMBAH: Popup menu untuk admin
+                    if (showMenu) ...[
+                      const SizedBox(width: 8),
+                      PopupMenuButton<String>(
+                        icon: Icon(Icons.more_vert_rounded, 
+                            color: AppColors.textSecondary.withOpacity(0.7)),
+                        itemBuilder: (context) => [
+                          PopupMenuItem<String>(
+                            value: 'edit',
+                            child: Row(
+                              children: [
+                                Icon(Icons.edit_rounded, 
+                                    size: 20, color: AppColors.primary),
+                                const SizedBox(width: 8),
+                                const Text('Edit Umpan Balik'),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem<String>(
+                            value: 'delete',
+                            child: Row(
+                              children: [
+                                Icon(Icons.delete_rounded, 
+                                    size: 20, color: Colors.red),
+                                const SizedBox(width: 8),
+                                const Text('Hapus', style: TextStyle(color: Colors.red)),
+                              ],
+                            ),
+                          ),
+                        ],
+                        onSelected: (value) {
+                          if (value == 'edit' && onEdit != null) {
+                            onEdit!();
+                          } else if (value == 'delete' && onDelete != null) {
+                            onDelete!();
+                          }
+                        },
+                      ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 12),

@@ -1,20 +1,29 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'app/theme.dart';
-import 'app/data.dart';
+import 'app/data.dart' hide AppConstants, AppColors;
 import 'screens/login_screen.dart';
 import 'screens/siswa_screen.dart';
 import 'screens/admin_screen.dart';
+import 'firebase_options.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
   ));
+
   runApp(const MyApp());
 }
+
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -69,7 +78,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => user.role == 'admin' ? const AdminScreen() : const SiswaScreen(),
+          builder: (_) => user.role == 'admin'
+    ? const AdminScreen()
+    : SiswaScreen(user: user),
         ),
       );
     } else {
@@ -117,7 +128,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   const SizedBox(height: 32),
                   const Text(
                     AppConstants.appName,
-                    style: TextStyle(
+                    style: TextStyle( 
                       fontSize: 48,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,

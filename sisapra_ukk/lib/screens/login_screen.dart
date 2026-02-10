@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
 import '../app/theme.dart';
-import '../app/data.dart';
+import '../app/data.dart' hide Helpers, AppColors, AppConstants;
 import '../widgets/common_widgets.dart';
 import 'siswa_screen.dart';
 import 'admin_screen.dart';
@@ -14,24 +14,25 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
   final _formKeyAdmin = GlobalKey<FormState>();
   final _formKeySiswa = GlobalKey<FormState>();
-  
+
   // Admin Controllers
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  
+
   // Siswa Controllers
   final _namaController = TextEditingController();
   final _nisnController = TextEditingController();
   final _kelasController = TextEditingController();
-  
+
   bool _obscurePassword = true;
   bool _isLoading = false;
   bool _isAdminMode = true; // Toggle between admin and siswa
   String _generatedCode = ''; // Menyimpan kode unik yang digenerate
-  
+
   late AnimationController _animController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -65,18 +66,23 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   }
 
   Future<void> _handleAdminLogin() async {
-    if (!_formKeyAdmin.currentState!.validate()) return;
+  if (!_formKeyAdmin.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
-    final user = await DataManager.login(
-      _emailController.text.trim(),
-      _passwordController.text,
-    );
-    setState(() => _isLoading = false);
+  setState(() => _isLoading = true);
 
-    if (!mounted) return;
+  final result = await DataManager.login(
+    _emailController.text.trim(),
+    _passwordController.text,
+  );
 
-    if (user != null && user.role == 'admin') {
+  setState(() => _isLoading = false);
+
+  if (!mounted) return;
+
+  if (result['success'] == true) {
+    final user = result['user'] as User;
+
+    if (user.role == 'admin') {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const AdminScreen()),
@@ -84,28 +90,36 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     } else {
       Helpers.showSnackBar(
         context,
-        'Email atau password admin salah',
+        'Bukan akun admin',
         isError: true,
       );
     }
+  } else {
+    Helpers.showSnackBar(
+      context,
+      result['message'] ?? 'Login admin gagal',
+      isError: true,
+    );
   }
+}
 
   // Generate kode unik random
   String _generateUniqueCode() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     final random = Random();
-    final timestamp = DateTime.now().millisecondsSinceEpoch.toString().substring(7);
-    
+    final timestamp =
+        DateTime.now().millisecondsSinceEpoch.toString().substring(7);
+
     // Format: SISAPRA-XXXX-YYYY (contoh: SISAPRA-A3X9-1234)
     String code = 'SISAPRA-';
-    
+
     // 4 karakter random
     for (int i = 0; i < 4; i++) {
       code += chars[random.nextInt(chars.length)];
     }
-    
+
     code += '-$timestamp';
-    
+
     return code;
   }
 
@@ -122,7 +136,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   }
 
   // Simpan data siswa
-  Future<void> _saveStudentData(String nama, String nisn, String kelas, String code) async {
+  Future<void> _saveStudentData(
+      String nama, String nisn, String kelas, String code) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('student_nama', nama);
     await prefs.setString('student_nisn', nisn);
@@ -133,53 +148,54 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   }
 
   Future<void> _handleSiswaLogin() async {
-    if (!_formKeySiswa.currentState!.validate()) return;
+  if (!_formKeySiswa.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
-    
-    final nisn = _nisnController.text.trim();
-    final nama = _namaController.text.trim();
-    final kelas = _kelasController.text.trim();
-    
-    // Delay untuk simulasi proses
-    await Future.delayed(const Duration(milliseconds: 1000));
-    
-    // Cek apakah siswa sudah punya kode unik
-    String? existingCode = await _getExistingCode(nisn);
-    String kodeUnik;
-    
-    if (existingCode != null) {
-      // Siswa sudah pernah login, gunakan kode yang sudah ada
-      kodeUnik = existingCode;
-    } else {
-      // Siswa baru, generate kode unik baru
-      kodeUnik = _generateUniqueCode();
-      await _saveStudentCode(nisn, kodeUnik);
-    }
-    
-    // Simpan semua data siswa
-    await _saveStudentData(nama, nisn, kelas, kodeUnik);
-    
-    setState(() {
-      _isLoading = false;
-      _generatedCode = kodeUnik;
-    });
+  setState(() => _isLoading = true);
 
-    if (!mounted) return;
+  final nisn = _nisnController.text.trim();
+  final nama = _namaController.text.trim();
+  final kelas = _kelasController.text.trim();
 
-    // Tampilkan dialog dengan kode unik
-    await _showSuccessDialog(nama, kodeUnik, existingCode != null);
-    
-    // Navigate ke SiswaScreen
-    if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const SiswaScreen()),
-      );
-    }
+  await Future.delayed(const Duration(milliseconds: 600));
+
+  String? existingCode = await _getExistingCode(nisn);
+  String kodeUnik = existingCode ?? _generateUniqueCode();
+
+  if (existingCode == null) {
+    await _saveStudentCode(nisn, kodeUnik);
   }
 
-  Future<void> _showSuccessDialog(String nama, String kodeUnik, bool isExisting) async {
+  await _saveStudentData(nama, nisn, kelas, kodeUnik);
+
+  setState(() {
+    _isLoading = false;
+    _generatedCode = kodeUnik;
+  });
+
+  if (!mounted) return;
+
+  await _showSuccessDialog(nama, kodeUnik, existingCode != null);
+
+  /// 🔥 BUAT USER SISWA DI SINI
+  final user = User(
+    id: nisn,
+    nama: nama,
+    email: '$nisn@siswa.local',
+    role: 'siswa',
+    kelas: kelas,
+  );
+
+  /// 🔥 KIRIM USER LANGSUNG (INI KUNCI)
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(
+      builder: (_) => SiswaScreen(user: user),
+    ),
+  );
+}
+
+  Future<void> _showSuccessDialog(
+      String nama, String kodeUnik, bool isExisting) async {
     return showDialog(
       context: context,
       barrierDismissible: false,
@@ -252,7 +268,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            isExisting ? Icons.verified_user_rounded : Icons.vpn_key_rounded,
+                            isExisting
+                                ? Icons.verified_user_rounded
+                                : Icons.vpn_key_rounded,
                             color: AppColors.primary,
                             size: 20,
                           ),
@@ -280,13 +298,16 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        isExisting 
+                        isExisting
                             ? 'Gunakan kode ini untuk keperluan admin'
                             : '⚠️ Simpan kode ini untuk keperluan admin',
                         style: TextStyle(
                           fontSize: 11,
-                          color: isExisting ? AppColors.textSecondary : Colors.orange.shade800,
-                          fontWeight: isExisting ? FontWeight.normal : FontWeight.w600,
+                          color: isExisting
+                              ? AppColors.textSecondary
+                              : Colors.orange.shade800,
+                          fontWeight:
+                              isExisting ? FontWeight.normal : FontWeight.w600,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -416,7 +437,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                             ),
                             Expanded(
                               child: _buildRoleButton(
-                                'Siswa',
+                                'Form Siswa',
                                 Icons.person_rounded,
                                 !_isAdminMode,
                                 () => _toggleMode(),
@@ -556,7 +577,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
               ],
             ),
             const SizedBox(height: 24),
-
             ModernTextField(
               label: 'Email',
               hint: 'Masukkan email admin',
@@ -565,7 +585,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
               validator: (v) => v!.isEmpty ? 'Email harus diisi' : null,
             ),
             const SizedBox(height: 20),
-
             ModernTextField(
               label: 'Password',
               hint: 'Masukkan password',
@@ -584,9 +603,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
               validator: (v) => v!.isEmpty ? 'Password harus diisi' : null,
             ),
             const SizedBox(height: 32),
-
             GradientButton(
-              text: 'Masuk',
+              text: 'Lanjutkan ke Aspirasi',
               onPressed: _handleAdminLogin,
               isLoading: _isLoading,
               icon: Icons.login_rounded,
@@ -632,9 +650,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                     size: 24,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 15),
                 const Text(
-                  'Login Siswa',
+                  'Isi Data Siswa',
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -659,8 +677,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
               hint: 'Masukkan nama lengkap',
               icon: Icons.badge_rounded,
               controller: _namaController,
-              validator: (v) =>
-                  v!.isEmpty ? 'Nama lengkap harus diisi' : null,
+              validator: (v) => v!.isEmpty ? 'Nama lengkap harus diisi' : null,
             ),
             const SizedBox(height: 16),
 
@@ -745,7 +762,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             const SizedBox(height: 28),
 
             GradientButton(
-              text: 'Masuk',
+              text: 'Lanjutkan ke Aspirasi',
               onPressed: _handleSiswaLogin,
               isLoading: _isLoading,
               icon: Icons.login_rounded,
@@ -792,4 +809,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       ),
     );
   }
+}
+
+extension on Map<String, dynamic> {
+  get role => null;
 }
