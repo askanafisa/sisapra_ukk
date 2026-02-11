@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 // ============================================================================
 // USER MODEL
@@ -202,13 +202,44 @@ class DataManager {
 
   // GET ASPIRASI
   static Future<List<Aspirasi>> getAspirasi() async {
+    // Try Firestore first
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final jsonStr = prefs.getString('aspirasi') ?? '[]';
-      final List data = jsonDecode(jsonStr);
-      return data.map((e) => Aspirasi.fromJson(e)).toList();
-    } catch (_) {
-      return [];
+      print('🔥 [FIRESTORE] Fetching aspirasi...');
+      final coll = FirebaseFirestore.instance.collection('aspirasi');
+      final snapshot = await coll.orderBy('tanggal', descending: true).get();
+      print('✅ [FIRESTORE] Found ${snapshot.docs.length} documents');
+      return snapshot.docs.map((d) {
+        final data = Map<String, dynamic>.from(d.data());
+
+        // Normalize tanggal: allow Timestamp or String
+        final t = data['tanggal'];
+        if (t is Timestamp) {
+          data['tanggal'] = t.toDate().toIso8601String();
+        } else if (t is DateTime) {
+          data['tanggal'] = t.toIso8601String();
+        } else if (t == null) {
+          data['tanggal'] = DateTime.now().toIso8601String();
+        }
+
+        // Ensure id is present
+        data['id'] = data['id'] ?? d.id;
+
+        return Aspirasi.fromJson(data);
+      }).toList();
+    } catch (e) {
+      // Fallback to local storage
+      print('❌ [FIRESTORE] Error: $e');
+      print('💾 [LOCAL] Falling back to SharedPreferences');
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final jsonStr = prefs.getString('aspirasi') ?? '[]';
+        final List data = jsonDecode(jsonStr);
+        print('✅ [LOCAL] Found ${data.length} local aspirasi');
+        return data.map((e) => Aspirasi.fromJson(e)).toList();
+      } catch (e) {
+        print('❌ [LOCAL] Error: $e');
+        return [];
+      }
     }
   }
 
@@ -218,78 +249,123 @@ class DataManager {
     if (aspirasi.judul.isEmpty || aspirasi.deskripsi.isEmpty) {
       throw Exception('Judul dan deskripsi harus diisi');
     }
-
-    final list = await getAspirasi();
-    list.add(aspirasi);
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      'aspirasi',
-      jsonEncode(list.map((e) => e.toJson()).toList()),
-    );
-  }
-
-  // UPDATE ASPIRASI
-  static Future<void> updateAspirasi(Aspirasi updated) async {
-    final list = await getAspirasi();
-    final index = list.indexWhere((a) => a.id == updated.id);
-    if (index == -1) return;
-
-    list[index] = updated;
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      'aspirasi',
-      jsonEncode(list.map((e) => e.toJson()).toList()),
-    );
-  }
-
-  // ✅ TAMBAH: EDIT ASPIRASI UNTUK SISWA
-  static Future<bool> editAspirasi(Aspirasi updated) async {
+    // Try to write to Firestore
     try {
+      print('🔥 [FIRESTORE] Attempting to add aspirasi: ${aspirasi.id}');
+      final coll = FirebaseFirestore.instance.collection('aspirasi');
+      final docRef = coll.doc(aspirasi.id);
+      final data = aspirasi.toJson();
+      // Store tanggal as Timestamp for Firestore
+      data['tanggal'] = Timestamp.fromDate(aspirasi.tanggal);
+      print('🔥 [FIRESTORE] Data to save: $data');
+      await docRef.set(data);
+      print('✅ [FIRESTORE] Successfully saved aspirasi: ${aspirasi.id}');
+      return;
+    } catch (e) {
+      // Fallback to local storage
+      print('❌ [FIRESTORE] Error: $e');
+      print('💾 [LOCAL] Falling back to SharedPreferences');
       final list = await getAspirasi();
-      final index = list.indexWhere((a) => a.id == updated.id);
-
-      if (index == -1) return false;
-
-      // Pastikan hanya data tertentu yang bisa diubah oleh siswa
-      list[index] = list[index].copyWith(
-        judul: updated.judul,
-        deskripsi: updated.deskripsi,
-        kategori: updated.kategori,
-      );
+      list.add(aspirasi);
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
         'aspirasi',
         jsonEncode(list.map((e) => e.toJson()).toList()),
       );
+      print('✅ [LOCAL] Saved to SharedPreferences');
+    }
+  }
+
+  // UPDATE ASPIRASI
+  static Future<void> updateAspirasi(Aspirasi updated) async {
+    try {
+      final docRef =
+          FirebaseFirestore.instance.collection('aspirasi').doc(updated.id);
+      final data = updated.toJson();
+      data['tanggal'] = Timestamp.fromDate(updated.tanggal);
+      await docRef.set(data, SetOptions(merge: true));
+      return;
+    } catch (_) {
+      final list = await getAspirasi();
+      final index = list.indexWhere((a) => a.id == updated.id);
+      if (index == -1) return;
+
+      list[index] = updated;
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        'aspirasi',
+        jsonEncode(list.map((e) => e.toJson()).toList()),
+      );
+    }
+  }
+
+  // ✅ TAMBAH: EDIT ASPIRASI UNTUK SISWA
+  static Future<bool> editAspirasi(Aspirasi updated) async {
+    try {
+      // Try update in Firestore
+      final docRef =
+          FirebaseFirestore.instance.collection('aspirasi').doc(updated.id);
+      final snapshot = await docRef.get();
+      if (!snapshot.exists) return false;
+
+      await docRef.update({
+        'judul': updated.judul,
+        'deskripsi': updated.deskripsi,
+        'kategori': updated.kategori,
+      });
       return true;
     } catch (_) {
-      return false;
+      // Fallback to local
+      try {
+        final list = await getAspirasi();
+        final index = list.indexWhere((a) => a.id == updated.id);
+
+        if (index == -1) return false;
+
+        list[index] = list[index].copyWith(
+          judul: updated.judul,
+          deskripsi: updated.deskripsi,
+          kategori: updated.kategori,
+        );
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+          'aspirasi',
+          jsonEncode(list.map((e) => e.toJson()).toList()),
+        );
+        return true;
+      } catch (_) {
+        return false;
+      }
     }
   }
 
   // ✅ TAMBAH: DELETE ASPIRASI
   static Future<bool> deleteAspirasi(String id) async {
     try {
-      final list = await getAspirasi();
-      
-      // Validasi apakah data exist
-      if (!list.any((a) => a.id == id)) {
-        return false; // Data tidak ditemukan
-      }
-      
-      list.removeWhere((a) => a.id == id);
-
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-        'aspirasi',
-        jsonEncode(list.map((e) => e.toJson()).toList()),
-      );
+      // Try Firestore delete
+      final docRef = FirebaseFirestore.instance.collection('aspirasi').doc(id);
+      final snapshot = await docRef.get();
+      if (!snapshot.exists) return false;
+      await docRef.delete();
       return true;
     } catch (_) {
-      return false;
+      // Fallback to local
+      try {
+        final list = await getAspirasi();
+        if (!list.any((a) => a.id == id)) return false;
+        list.removeWhere((a) => a.id == id);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+          'aspirasi',
+          jsonEncode(list.map((e) => e.toJson()).toList()),
+        );
+        return true;
+      } catch (_) {
+        return false;
+      }
     }
   }
 
@@ -301,73 +377,5 @@ class DataManager {
 // ============================================================================
 // HELPERS, CONSTANTS, COLORS
 // ============================================================================
-class Helpers {
-  static String formatDate(DateTime date) {
-    final months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'Mei',
-      'Jun',
-      'Jul',
-      'Agu',
-      'Sep',
-      'Okt',
-      'Nov',
-      'Des'
-    ];
-    return '${date.day} ${months[date.month - 1]} ${date.year}';
-  }
-
-  static Color getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return Colors.orange;
-      case 'diproses':
-        return Colors.blue;
-      case 'selesai':
-        return Colors.green;
-      case 'ditolak':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  static IconData getStatusIcon(String status) {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return Icons.schedule;
-      case 'diproses':
-        return Icons.refresh;
-      case 'selesai':
-        return Icons.check_circle;
-      case 'ditolak':
-        return Icons.cancel;
-      default:
-        return Icons.help_outline;
-    }
-  }
-
-  static void showSnackBar(BuildContext context, String message,
-      {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red : Colors.green,
-      ),
-    );
-  }
-}
-
-class AppConstants {
-  static const String appName = 'ASPIRASI SARANA';
-}
-
-class AppColors {
-  static const Color primary = Color(0xFF6366F1);
-  static const Color secondary = Color(0xFF8B5CF6);
-
-  static Gradient? get primaryGradient => null;
-}
+// Helpers, AppConstants and AppColors are defined in lib/app/theme.dart
+// to keep them centralized. Keep this file focused on models and data.

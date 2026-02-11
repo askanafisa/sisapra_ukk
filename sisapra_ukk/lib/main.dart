@@ -1,8 +1,9 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'app/theme.dart';
-import 'app/data.dart' hide AppConstants, AppColors;
+import 'app/data.dart';
 import 'screens/login_screen.dart';
 import 'screens/siswa_screen.dart';
 import 'screens/admin_screen.dart';
@@ -24,17 +25,26 @@ void main() async {
   runApp(const MyApp());
 }
 
-
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: AppConstants.appName,
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.theme,
-      home: const SplashScreen(),
+    return ChangeNotifierProvider(
+      create: (_) => ThemeProvider(),
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, _) {
+          return MaterialApp(
+            title: AppConstants.appName,
+            debugShowCheckedModeBanner: false,
+            theme: themeProvider.currentTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode:
+                themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+            home: const SplashScreen(),
+          );
+        },
+      ),
     );
   }
 }
@@ -46,7 +56,8 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
@@ -79,8 +90,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         context,
         MaterialPageRoute(
           builder: (_) => user.role == 'admin'
-    ? const AdminScreen()
-    : SiswaScreen(user: user),
+              ? const AdminScreen()
+              : SiswaScreen(user: user),
         ),
       );
     } else {
@@ -101,7 +112,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
+        decoration:
+            BoxDecoration(gradient: DynamicAppColors.primaryGradient(context)),
         child: Center(
           child: FadeTransition(
             opacity: _fadeAnimation,
@@ -123,12 +135,13 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                         ),
                       ],
                     ),
-                    child: const Icon(Icons.school_rounded, size: 80, color: AppColors.primary),
+                    child: const Icon(Icons.school_rounded,
+                        size: 80, color: AppColors.primary),
                   ),
                   const SizedBox(height: 32),
                   const Text(
                     AppConstants.appName,
-                    style: TextStyle( 
+                    style: TextStyle(
                       fontSize: 48,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,

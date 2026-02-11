@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import '../app/theme.dart';
-import '../app/data.dart' hide Helpers, AppColors, AppConstants;
+import '../app/data.dart';
 import '../widgets/common_widgets.dart';
 
 /// Tab Form untuk mengirim aspirasi baru
 class SiswaFormTab extends StatefulWidget {
   final User? user;
   final VoidCallback? onSubmitted;
-  
+
   const SiswaFormTab({
     super.key,
     this.user,
@@ -22,7 +22,7 @@ class _SiswaFormTabState extends State<SiswaFormTab> {
   final _formKey = GlobalKey<FormState>();
   final _judulController = TextEditingController();
   final _deskripsiController = TextEditingController();
-  String? _selectedKategori; 
+  String? _selectedKategori;
   bool _isSubmitting = false;
 
   @override
@@ -47,7 +47,7 @@ class _SiswaFormTabState extends State<SiswaFormTab> {
         judul: _judulController.text.trim(),
         deskripsi: _deskripsiController.text.trim(),
         tanggal: DateTime.now(),
-        status: 'pending',           // 👈 Sesuai dengan data.dart
+        status: 'pending', // 👈 Sesuai dengan data.dart
         progres: 'Menunggu review admin',
       );
 
@@ -61,13 +61,13 @@ class _SiswaFormTabState extends State<SiswaFormTab> {
           _judulController.clear();
           _deskripsiController.clear();
         });
-        
+
         // Tampilkan notifikasi sukses
         Helpers.showSnackBar(context, '✅ Aspirasi berhasil dikirim!');
-        
+
         // Reset form state
         _formKey.currentState!.reset();
-        
+
         // Trigger callback untuk pindah ke tab histori
         widget.onSubmitted?.call();
       }
@@ -120,7 +120,7 @@ class _SiswaFormTabState extends State<SiswaFormTab> {
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // Dropdown Kategori
             DropdownButtonFormField<String>(
               value: _selectedKategori,
@@ -135,12 +135,13 @@ class _SiswaFormTabState extends State<SiswaFormTab> {
               validator: (v) => v == null ? 'Pilih kategori' : null,
             ),
             const SizedBox(height: 20),
-            
+
             // Input Judul
             ModernTextField(
               label: 'Judul',
               hint: 'Ringkasan masalah',
               icon: Icons.title_rounded,
+              keyboardType: TextInputType.text,
               controller: _judulController,
               maxLength: 100,
               validator: (v) => v!.isEmpty
@@ -150,12 +151,13 @@ class _SiswaFormTabState extends State<SiswaFormTab> {
                       : null,
             ),
             const SizedBox(height: 20),
-            
+
             // Input Deskripsi
             ModernTextField(
               label: 'Deskripsi',
               hint: 'Jelaskan detail masalahnya',
               icon: Icons.description_rounded,
+              keyboardType: TextInputType.multiline,
               controller: _deskripsiController,
               maxLines: 6,
               maxLength: 500,
@@ -166,7 +168,7 @@ class _SiswaFormTabState extends State<SiswaFormTab> {
                       : null,
             ),
             const SizedBox(height: 32),
-            
+
             // Tombol Submit
             GradientButton(
               text: 'Kirim Aspirasi',

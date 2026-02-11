@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../app/theme.dart';
-import '../app/data.dart' hide AppColors, Helpers, AppConstants;
+import '../app/data.dart';
 import '../widgets/common_widgets.dart';
 
 // ============================================================================
@@ -75,9 +75,7 @@ class SiswaHistoriTabState extends State<SiswaHistoriTab> {
       if (widget.userId == null) {
         _aspirasi = [];
       } else {
-        _aspirasi = all
-            .where((a) => a.userId == widget.userId)
-            .toList()
+        _aspirasi = all.where((a) => a.userId == widget.userId).toList()
           ..sort((a, b) => b.tanggal.compareTo(a.tanggal));
       }
       _applyFilter(); // ✅ TAMBAH: Apply filter setelah load data
@@ -99,20 +97,20 @@ class SiswaHistoriTabState extends State<SiswaHistoriTab> {
       final judul = a.judul.toLowerCase();
       final kategori = a.kategori.toLowerCase();
       final deskripsi = a.deskripsi.toLowerCase();
-      
-      return judul.contains(query) || 
-             kategori.contains(query) || 
-             deskripsi.contains(query);
+
+      return judul.contains(query) ||
+          kategori.contains(query) ||
+          deskripsi.contains(query);
     }).toList();
 
     // Sort berdasarkan relevansi
     _filteredAspirasi.sort((a, b) {
       final judulA = a.judul.toLowerCase();
       final judulB = b.judul.toLowerCase();
-      
+
       final aStartsWith = judulA.startsWith(query);
       final bStartsWith = judulB.startsWith(query);
-      
+
       if (aStartsWith && !bStartsWith) return -1;
       if (!aStartsWith && bStartsWith) return 1;
       return b.tanggal.compareTo(a.tanggal);
@@ -130,15 +128,15 @@ class SiswaHistoriTabState extends State<SiswaHistoriTab> {
     final spans = <TextSpan>[];
     final textLower = text.toLowerCase();
     final queryLower = query.toLowerCase();
-    
+
     int start = 0;
     int indexOfMatch;
-    
+
     while ((indexOfMatch = textLower.indexOf(queryLower, start)) != -1) {
       if (indexOfMatch > start) {
         spans.add(TextSpan(text: text.substring(start, indexOfMatch)));
       }
-      
+
       spans.add(TextSpan(
         text: text.substring(indexOfMatch, indexOfMatch + query.length),
         style: TextStyle(
@@ -147,14 +145,14 @@ class SiswaHistoriTabState extends State<SiswaHistoriTab> {
           fontWeight: FontWeight.bold,
         ),
       ));
-      
+
       start = indexOfMatch + query.length;
     }
-    
+
     if (start < text.length) {
       spans.add(TextSpan(text: text.substring(start)));
     }
-    
+
     return spans;
   }
 
@@ -212,16 +210,13 @@ class SiswaHistoriTabState extends State<SiswaHistoriTab> {
 
     if (confirm == true && mounted) {
       final success = await DataManager.deleteAspirasi(aspirasi.id);
-      
+
       if (success) {
         await _loadData();
         Helpers.showSnackBar(context, '✅ Aspirasi berhasil dihapus!');
       } else {
-        Helpers.showSnackBar(
-          context, 
-          '❌ Gagal menghapus aspirasi', 
-          isError: true
-        );
+        Helpers.showSnackBar(context, '❌ Gagal menghapus aspirasi',
+            isError: true);
       }
     }
   }
@@ -284,9 +279,12 @@ class SiswaHistoriTabState extends State<SiswaHistoriTab> {
             borderRadius: BorderRadius.circular(12),
             borderSide: const BorderSide(color: AppColors.primary, width: 2),
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           filled: true,
-          fillColor: Colors.white,
+          fillColor: Theme.of(context).brightness == Brightness.dark 
+              ? Colors.black.withOpacity(0.25)
+              : Colors.white,
         ),
       ),
     );
@@ -345,12 +343,11 @@ class SiswaHistoriTabState extends State<SiswaHistoriTab> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        _searchQuery.isNotEmpty 
-                            ? Icons.search_off // ✅ TAMBAH: Icon khusus search
-                            : Icons.inbox_rounded,
-                        size: 100,
-                        color: Colors.grey.shade300
-                      ),
+                          _searchQuery.isNotEmpty
+                              ? Icons.search_off // ✅ TAMBAH: Icon khusus search
+                              : Icons.inbox_rounded,
+                          size: 100,
+                          color: Colors.grey.shade300),
                       const SizedBox(height: 16),
                       Text(
                         widget.userId == null
@@ -358,7 +355,8 @@ class SiswaHistoriTabState extends State<SiswaHistoriTab> {
                             : _searchQuery.isNotEmpty
                                 ? 'Tidak ada hasil untuk "$_searchQuery"' // ✅ TAMBAH
                                 : 'Belum ada aspirasi',
-                        style: TextStyle(fontSize: 16, color: AppColors.textSecondary),
+                        style: TextStyle(
+                            fontSize: 16, color: AppColors.textSecondary),
                         textAlign: TextAlign.center,
                       ),
                       // ✅ TAMBAH: Tombol reset search
@@ -441,13 +439,15 @@ class SiswaHistoriTabState extends State<SiswaHistoriTab> {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  const Icon(Icons.category, size: 16, color: AppColors.textSecondary),
+                  const Icon(Icons.category,
+                      size: 16, color: AppColors.textSecondary),
                   const SizedBox(width: 4),
                   Expanded(
                     child: RichText(
                       text: TextSpan(
                         children: _highlightText(a.kategori, _searchQuery),
-                        style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                        style: const TextStyle(
+                            fontSize: 14, color: AppColors.textSecondary),
                       ),
                     ),
                   ),
@@ -457,7 +457,9 @@ class SiswaHistoriTabState extends State<SiswaHistoriTab> {
               RichText(
                 text: TextSpan(
                   children: _highlightText(
-                    a.deskripsi.length > 100 ? '${a.deskripsi.substring(0, 100)}...' : a.deskripsi,
+                    a.deskripsi.length > 100
+                        ? '${a.deskripsi.substring(0, 100)}...'
+                        : a.deskripsi,
                     _searchQuery,
                   ),
                   style: const TextStyle(fontSize: 13, color: Colors.black87),
@@ -495,13 +497,15 @@ class SiswaHistoriTabState extends State<SiswaHistoriTab> {
                             children: [
                               Icon(Icons.delete, size: 18, color: Colors.red),
                               SizedBox(width: 8),
-                              Text('Hapus', style: TextStyle(color: Colors.red)),
+                              Text('Hapus',
+                                  style: TextStyle(color: Colors.red)),
                             ],
                           ),
                         ),
                       ],
                       onSelected: (value) {
-                        if (value == 'edit') _showEditForm(a);
+                        if (value == 'edit')
+                          _showEditForm(a);
                         else if (value == 'delete') _confirmDelete(a);
                       },
                     ),
@@ -544,7 +548,6 @@ class SiswaHistoriTabState extends State<SiswaHistoriTab> {
                 ),
               ),
               const SizedBox(height: 24),
-
               Row(
                 children: [
                   Expanded(
@@ -565,16 +568,13 @@ class SiswaHistoriTabState extends State<SiswaHistoriTab> {
                 ],
               ),
               const SizedBox(height: 16),
-
               _infoRow(
                 Icons.calendar_today_rounded,
                 Helpers.formatDate(a.tanggal),
               ),
               _infoRow(Icons.category_rounded, a.kategori),
               const SizedBox(height: 24),
-
               _section('Deskripsi', Icons.description_rounded, a.deskripsi),
-
               if (a.umpanBalik != null && a.umpanBalik!.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 _section(
@@ -584,7 +584,6 @@ class SiswaHistoriTabState extends State<SiswaHistoriTab> {
                   color: AppColors.info,
                 ),
               ],
-
               if (a.progres.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 _section(
@@ -594,7 +593,6 @@ class SiswaHistoriTabState extends State<SiswaHistoriTab> {
                   color: AppColors.success,
                 ),
               ],
-              
               if (a.status.toLowerCase() == 'pending') ...[
                 const SizedBox(height: 24),
                 Row(
@@ -614,7 +612,8 @@ class SiswaHistoriTabState extends State<SiswaHistoriTab> {
                           children: [
                             Icon(Icons.edit_rounded, color: AppColors.primary),
                             const SizedBox(width: 8),
-                            Text('Edit', style: TextStyle(color: AppColors.primary)),
+                            Text('Edit',
+                                style: TextStyle(color: AppColors.primary)),
                           ],
                         ),
                       ),
@@ -802,7 +801,6 @@ class _EditAspirasiFormState extends State<_EditAspirasiForm> {
                 ),
               ),
               const SizedBox(height: 24),
-
               const Text(
                 'Edit Aspirasi',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
@@ -811,12 +809,11 @@ class _EditAspirasiFormState extends State<_EditAspirasiForm> {
               Text(
                 'Status: ${widget.aspirasi.status.toUpperCase()}',
                 style: TextStyle(
-                  color: Helpers.getStatusColor(widget.aspirasi.status),
+                  color: Helpers.getStatusColor(widget.aspirasi.status, context),
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 24),
-
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -841,7 +838,6 @@ class _EditAspirasiFormState extends State<_EditAspirasiForm> {
                 ),
               ),
               const SizedBox(height: 20),
-
               DropdownButtonFormField<String>(
                 value: _selectedKategori,
                 decoration: const InputDecoration(
@@ -855,11 +851,11 @@ class _EditAspirasiFormState extends State<_EditAspirasiForm> {
                 validator: (v) => v == null ? 'Pilih kategori' : null,
               ),
               const SizedBox(height: 20),
-
               ModernTextField(
                 label: 'Judul',
                 hint: 'Ringkasan masalah',
                 icon: Icons.title_rounded,
+                keyboardType: TextInputType.text,
                 controller: _judulController,
                 maxLength: 100,
                 validator: (v) => v!.isEmpty
@@ -869,11 +865,11 @@ class _EditAspirasiFormState extends State<_EditAspirasiForm> {
                         : null,
               ),
               const SizedBox(height: 20),
-
               ModernTextField(
                 label: 'Deskripsi',
                 hint: 'Jelaskan detail masalahnya',
                 icon: Icons.description_rounded,
+                keyboardType: TextInputType.multiline,
                 controller: _deskripsiController,
                 maxLines: 6,
                 maxLength: 500,
@@ -884,7 +880,6 @@ class _EditAspirasiFormState extends State<_EditAspirasiForm> {
                         : null,
               ),
               const SizedBox(height: 32),
-
               GradientButton(
                 text: 'Perbarui Aspirasi',
                 icon: Icons.update_rounded,

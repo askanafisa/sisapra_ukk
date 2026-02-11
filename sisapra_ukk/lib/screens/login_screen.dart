@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 import 'dart:math';
 import '../app/theme.dart';
-import '../app/data.dart' hide Helpers, AppColors, AppConstants;
+import '../app/data.dart';
 import '../widgets/common_widgets.dart';
 import 'siswa_screen.dart';
 import 'admin_screen.dart';
+import 'firestore_diagnostic.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -25,13 +28,12 @@ class _LoginScreenState extends State<LoginScreen>
 
   // Siswa Controllers
   final _namaController = TextEditingController();
-  final _nisnController = TextEditingController();
+  final _nisController = TextEditingController();
   final _kelasController = TextEditingController();
 
   bool _obscurePassword = true;
   bool _isLoading = false;
   bool _isAdminMode = true; // Toggle between admin and siswa
-  String _generatedCode = ''; // Menyimpan kode unik yang digenerate
 
   late AnimationController _animController;
   late Animation<double> _fadeAnimation;
@@ -60,48 +62,48 @@ class _LoginScreenState extends State<LoginScreen>
     _emailController.dispose();
     _passwordController.dispose();
     _namaController.dispose();
-    _nisnController.dispose();
+    _nisController.dispose();
     _kelasController.dispose();
     super.dispose();
   }
 
   Future<void> _handleAdminLogin() async {
-  if (!_formKeyAdmin.currentState!.validate()) return;
+    if (!_formKeyAdmin.currentState!.validate()) return;
 
-  setState(() => _isLoading = true);
+    setState(() => _isLoading = true);
 
-  final result = await DataManager.login(
-    _emailController.text.trim(),
-    _passwordController.text,
-  );
+    final result = await DataManager.login(
+      _emailController.text.trim(),
+      _passwordController.text,
+    );
 
-  setState(() => _isLoading = false);
+    setState(() => _isLoading = false);
 
-  if (!mounted) return;
+    if (!mounted) return;
 
-  if (result['success'] == true) {
-    final user = result['user'] as User;
+    if (result['success'] == true) {
+      final user = result['user'] as User;
 
-    if (user.role == 'admin') {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const AdminScreen()),
-      );
+      if (user.role == 'admin') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const AdminScreen()),
+        );
+      } else {
+        Helpers.showSnackBar(
+          context,
+          'Bukan akun admin',
+          isError: true,
+        );
+      }
     } else {
       Helpers.showSnackBar(
         context,
-        'Bukan akun admin',
+        result['message'] ?? 'Login admin gagal',
         isError: true,
       );
     }
-  } else {
-    Helpers.showSnackBar(
-      context,
-      result['message'] ?? 'Login admin gagal',
-      isError: true,
-    );
   }
-}
 
   // Generate kode unik random
   String _generateUniqueCode() {
@@ -123,24 +125,24 @@ class _LoginScreenState extends State<LoginScreen>
     return code;
   }
 
-  // Cek apakah NISN sudah pernah login
-  Future<String?> _getExistingCode(String nisn) async {
+  // Cek apakah NIS sudah pernah login
+  Future<String?> _getExistingCode(String nis) async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('student_code_$nisn');
+    return prefs.getString('student_code_$nis');
   }
 
   // Simpan kode unik siswa
-  Future<void> _saveStudentCode(String nisn, String code) async {
+  Future<void> _saveStudentCode(String nis, String code) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('student_code_$nisn', code);
+    await prefs.setString('student_code_$nis', code);
   }
 
   // Simpan data siswa
   Future<void> _saveStudentData(
-      String nama, String nisn, String kelas, String code) async {
+      String nama, String nis, String kelas, String code) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('student_nama', nama);
-    await prefs.setString('student_nisn', nisn);
+    await prefs.setString('student_nis', nis);
     await prefs.setString('student_kelas', kelas);
     await prefs.setString('student_code', code);
     await prefs.setBool('is_logged_in', true);
@@ -148,51 +150,50 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Future<void> _handleSiswaLogin() async {
-  if (!_formKeySiswa.currentState!.validate()) return;
+    if (!_formKeySiswa.currentState!.validate()) return;
 
-  setState(() => _isLoading = true);
+    setState(() => _isLoading = true);
 
-  final nisn = _nisnController.text.trim();
-  final nama = _namaController.text.trim();
-  final kelas = _kelasController.text.trim();
+    final nis = _nisController.text.trim();
+    final nama = _namaController.text.trim();
+    final kelas = _kelasController.text.trim();
 
-  await Future.delayed(const Duration(milliseconds: 600));
+    await Future.delayed(const Duration(milliseconds: 600));
 
-  String? existingCode = await _getExistingCode(nisn);
-  String kodeUnik = existingCode ?? _generateUniqueCode();
+    String? existingCode = await _getExistingCode(nis);
+    String kodeUnik = existingCode ?? _generateUniqueCode();
 
-  if (existingCode == null) {
-    await _saveStudentCode(nisn, kodeUnik);
+    if (existingCode == null) {
+      await _saveStudentCode(nis, kodeUnik);
+    }
+
+    await _saveStudentData(nama, nis, kelas, kodeUnik);
+
+    setState(() {
+      _isLoading = false;
+    });
+
+    if (!mounted) return;
+
+    await _showSuccessDialog(nama, kodeUnik, existingCode != null);
+
+    /// 🔥 BUAT USER SISWA DI SINI
+    final user = User(
+      id: nis,
+      nama: nama,
+      email: '$nis@siswa.local',
+      role: 'siswa',
+      kelas: kelas,
+    );
+
+    /// 🔥 KIRIM USER LANGSUNG (INI KUNCI)
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SiswaScreen(user: user),
+      ),
+    );
   }
-
-  await _saveStudentData(nama, nisn, kelas, kodeUnik);
-
-  setState(() {
-    _isLoading = false;
-    _generatedCode = kodeUnik;
-  });
-
-  if (!mounted) return;
-
-  await _showSuccessDialog(nama, kodeUnik, existingCode != null);
-
-  /// 🔥 BUAT USER SISWA DI SINI
-  final user = User(
-    id: nisn,
-    nama: nama,
-    email: '$nisn@siswa.local',
-    role: 'siswa',
-    kelas: kelas,
-  );
-
-  /// 🔥 KIRIM USER LANGSUNG (INI KUNCI)
-  Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(
-      builder: (_) => SiswaScreen(user: user),
-    ),
-  );
-}
 
   Future<void> _showSuccessDialog(
       String nama, String kodeUnik, bool isExisting) async {
@@ -356,129 +357,142 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: SlideTransition(
-                  position: _slideAnimation,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Logo Hero
-                      Hero(
-                        tag: 'logo',
-                        child: Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(30),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 30,
-                                offset: const Offset(0, 15),
+      body: Stack(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+                gradient: DynamicAppColors.primaryGradient(context)),
+            child: SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: SlideTransition(
+                      position: _slideAnimation,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Logo Hero
+                          Hero(
+                            tag: 'logo',
+                            child: Container(
+                              padding: const EdgeInsets.all(24),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(30),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 30,
+                                    offset: const Offset(0, 15),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.school_rounded,
-                            size: 70,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-
-                      // App Title
-                      const Text(
-                        AppConstants.appName,
-                        style: TextStyle(
-                          fontSize: 40,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        AppConstants.appFullName,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.white.withOpacity(0.9),
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 40),
-
-                      // Role Selector (Admin/Siswa Toggle)
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.3),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: _buildRoleButton(
-                                'Admin',
-                                Icons.admin_panel_settings_rounded,
-                                _isAdminMode,
-                                () => _toggleMode(),
+                              child: const Icon(
+                                Icons.school_rounded,
+                                size: 70,
+                                color: AppColors.primary,
                               ),
                             ),
-                            Expanded(
-                              child: _buildRoleButton(
-                                'Form Siswa',
-                                Icons.person_rounded,
-                                !_isAdminMode,
-                                () => _toggleMode(),
+                          ),
+                          const SizedBox(height: 32),
+                          const Text(
+                            AppConstants.appName,
+                            style: TextStyle(
+                              fontSize: 40,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            AppConstants.appFullName,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.white.withOpacity(0.9),
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 40),
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.3),
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Login Card
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 400),
-                        transitionBuilder: (child, animation) {
-                          return FadeTransition(
-                            opacity: animation,
-                            child: SlideTransition(
-                              position: Tween<Offset>(
-                                begin: const Offset(0, 0.1),
-                                end: Offset.zero,
-                              ).animate(animation),
-                              child: child,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: _buildRoleButton(
+                                    'Admin',
+                                    Icons.admin_panel_settings_rounded,
+                                    _isAdminMode,
+                                    () => _toggleMode(),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: _buildRoleButton(
+                                    'Form Siswa',
+                                    Icons.person_rounded,
+                                    !_isAdminMode,
+                                    () => _toggleMode(),
+                                  ),
+                                ),
+                              ],
                             ),
-                          );
-                        },
-                        child: _isAdminMode
-                            ? _buildAdminLoginCard()
-                            : _buildSiswaLoginCard(),
+                          ),
+                          const SizedBox(height: 24),
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 400),
+                            transitionBuilder: (child, animation) {
+                              return FadeTransition(
+                                opacity: animation,
+                                child: SlideTransition(
+                                  position: Tween<Offset>(
+                                    begin: const Offset(0, 0.1),
+                                    end: Offset.zero,
+                                  ).animate(animation),
+                                  child: child,
+                                ),
+                              );
+                            },
+                            child: _isAdminMode
+                                ? _buildAdminLoginCard(context)
+                                : _buildSiswaLoginCard(context),
+                          ),
+                          const SizedBox(height: 24),
+                          if (_isAdminMode) _buildDemoInfo(),
+                        ],
                       ),
-
-                      const SizedBox(height: 24),
-
-                      // Demo Info (hanya tampil di mode admin)
-                      if (_isAdminMode) _buildDemoInfo(),
-                    ],
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
+          // Theme Toggle Switch di pojok kanan atas
+          Positioned(
+            top: 16,
+            right: 16,
+            child: Consumer<ThemeProvider>(
+              builder: (context, themeProvider, _) {
+                return Switch(
+                  value: themeProvider.isDarkMode,
+                  onChanged: (_) => themeProvider.toggleTheme(),
+                  activeColor: Colors.yellow,
+                  inactiveThumbColor: Colors.white,
+                  activeTrackColor: Colors.white.withOpacity(0.3),
+                  inactiveTrackColor: Colors.white.withOpacity(0.5),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -530,12 +544,12 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  Widget _buildAdminLoginCard() {
+  Widget _buildAdminLoginCard(BuildContext context) {
     return Container(
       key: const ValueKey('admin'),
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: DynamicAppColors.overlayBackground(context),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
@@ -581,6 +595,7 @@ class _LoginScreenState extends State<LoginScreen>
               label: 'Email',
               hint: 'Masukkan email admin',
               icon: Icons.email_rounded,
+              keyboardType: TextInputType.emailAddress,
               controller: _emailController,
               validator: (v) => v!.isEmpty ? 'Email harus diisi' : null,
             ),
@@ -589,6 +604,7 @@ class _LoginScreenState extends State<LoginScreen>
               label: 'Password',
               hint: 'Masukkan password',
               icon: Icons.lock_rounded,
+              keyboardType: TextInputType.visiblePassword,
               controller: _passwordController,
               obscureText: _obscurePassword,
               suffixIcon: IconButton(
@@ -604,7 +620,7 @@ class _LoginScreenState extends State<LoginScreen>
             ),
             const SizedBox(height: 32),
             GradientButton(
-              text: 'Lanjutkan ke Aspirasi',
+              text: 'Login',
               onPressed: _handleAdminLogin,
               isLoading: _isLoading,
               icon: Icons.login_rounded,
@@ -615,12 +631,12 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  Widget _buildSiswaLoginCard() {
+  Widget _buildSiswaLoginCard(BuildContext context) {
     return Container(
       key: const ValueKey('siswa'),
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: DynamicAppColors.overlayBackground(context),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
@@ -656,7 +672,7 @@ class _LoginScreenState extends State<LoginScreen>
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+                    color: Color.fromARGB(255, 87, 86, 86),
                   ),
                 ),
               ],
@@ -666,7 +682,7 @@ class _LoginScreenState extends State<LoginScreen>
               'Isi data diri untuk masuk',
               style: TextStyle(
                 fontSize: 13,
-                color: AppColors.textSecondary.withOpacity(0.7),
+                color: const Color.fromARGB(255, 108, 74, 74).withOpacity(0.7),
               ),
               textAlign: TextAlign.center,
             ),
@@ -676,19 +692,23 @@ class _LoginScreenState extends State<LoginScreen>
               label: 'Nama Lengkap',
               hint: 'Masukkan nama lengkap',
               icon: Icons.badge_rounded,
+              keyboardType: TextInputType.name,
               controller: _namaController,
               validator: (v) => v!.isEmpty ? 'Nama lengkap harus diisi' : null,
             ),
             const SizedBox(height: 16),
 
             ModernTextField(
-              label: 'NISN',
-              hint: 'Masukkan NISN',
+              label: 'NIS',
+              hint: 'Masukkan NIS (4 digit)',
               icon: Icons.numbers_rounded,
-              controller: _nisnController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              controller: _nisController,
+              maxLength: 4,
               validator: (v) {
-                if (v!.isEmpty) return 'NISN harus diisi';
-                if (v.length < 10) return 'NISN harus 10 digit';
+                if (v!.isEmpty) return 'NIS harus diisi';
+                if (v.length != 4) return 'NIS harus tepat 4 digit';
                 return null;
               },
             ),
@@ -698,6 +718,7 @@ class _LoginScreenState extends State<LoginScreen>
               label: 'Kelas',
               hint: 'Contoh: XII IPA 1',
               icon: Icons.class_rounded,
+              keyboardType: TextInputType.text,
               controller: _kelasController,
               validator: (v) => v!.isEmpty ? 'Kelas harus diisi' : null,
             ),
@@ -767,6 +788,26 @@ class _LoginScreenState extends State<LoginScreen>
               isLoading: _isLoading,
               icon: Icons.login_rounded,
             ),
+
+            const SizedBox(height: 16),
+
+            // 🔍 Debug: Firestore Diagnostic Button
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const FirestoreDiagnosticScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.bug_report, size: 18),
+              label: const Text('🔍 Test Firestore Connection'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                side: BorderSide(color: AppColors.primary.withOpacity(0.5)),
+              ),
+            ),
           ],
         ),
       ),
@@ -809,8 +850,4 @@ class _LoginScreenState extends State<LoginScreen>
       ),
     );
   }
-}
-
-extension on Map<String, dynamic> {
-  get role => null;
 }

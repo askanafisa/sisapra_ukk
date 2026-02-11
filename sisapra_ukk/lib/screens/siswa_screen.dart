@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../app/theme.dart';
-import '../app/data.dart' hide AppConstants, AppColors;
+import '../app/data.dart';
 import '../widgets/common_widgets.dart';
 import 'login_screen.dart';
 import 'siswa_form_tab.dart';
@@ -71,7 +71,7 @@ class _SiswaScreenState extends State<SiswaScreen>
             width: double.infinity,
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              gradient: AppColors.primaryGradient,
+              gradient: DynamicAppColors.primaryGradient(context),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

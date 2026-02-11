@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../app/theme.dart';
-import '../app/data.dart' hide AppColors, Helpers;
+import '../app/data.dart';
 
 // Modern Gradient Button
 class GradientButton extends StatelessWidget {
@@ -21,7 +22,7 @@ class GradientButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        gradient: AppColors.primaryGradient,
+        gradient: DynamicAppColors.primaryGradient(context),
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -36,13 +37,15 @@ class GradientButton extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
         child: isLoading
             ? const SizedBox(
                 height: 20,
                 width: 20,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Colors.white),
               )
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -51,7 +54,9 @@ class GradientButton extends StatelessWidget {
                     Icon(icon, size: 20),
                     const SizedBox(width: 8),
                   ],
-                  Text(text, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  Text(text,
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w600)),
                 ],
               ),
       ),
@@ -70,6 +75,8 @@ class ModernTextField extends StatelessWidget {
   final String? Function(String?)? validator;
   final int maxLines;
   final int? maxLength;
+  final TextInputType keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
 
   const ModernTextField({
     super.key,
@@ -82,6 +89,8 @@ class ModernTextField extends StatelessWidget {
     this.validator,
     this.maxLines = 1,
     this.maxLength,
+    required this.keyboardType,
+    this.inputFormatters,
   });
 
   @override
@@ -103,12 +112,13 @@ class ModernTextField extends StatelessWidget {
           obscureText: obscureText,
           maxLines: maxLines,
           maxLength: maxLength,
+          keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
           validator: validator,
           decoration: InputDecoration(
             hintText: hint,
-            prefixIcon: icon != null
-                ? Icon(icon, color: AppColors.primary)
-                : null,
+            prefixIcon:
+                icon != null ? Icon(icon, color: AppColors.primary) : null,
             suffixIcon: suffixIcon,
             counterText: '',
           ),
@@ -125,7 +135,7 @@ class StatusBadge extends StatelessWidget {
   final VoidCallback? onEditPressed; // ✅ TAMBAH: Callback edit
 
   const StatusBadge({
-    super.key, 
+    super.key,
     required this.status,
     this.showEditIcon = false, // ✅ TAMBAH: Default false
     this.onEditPressed, // ✅ TAMBAH: Callback edit
@@ -133,9 +143,9 @@ class StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = Helpers.getStatusColor(status);
+    final color = Helpers.getStatusColor(status, context);
     final icon = Helpers.getStatusIcon(status);
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
@@ -159,9 +169,11 @@ class StatusBadge extends StatelessWidget {
               letterSpacing: 0.5,
             ),
           ),
-          
+
           // ✅ TAMBAH: Edit icon untuk siswa jika status pending
-          if (showEditIcon && (status.toLowerCase() == 'pending' || status.toLowerCase() == 'menunggu')) ...[
+          if (showEditIcon &&
+              (status.toLowerCase() == 'pending' ||
+                  status.toLowerCase() == 'menunggu')) ...[
             const SizedBox(width: 8),
             GestureDetector(
               onTap: onEditPressed,
@@ -171,8 +183,7 @@ class StatusBadge extends StatelessWidget {
                   color: Colors.blue.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.edit_rounded, 
-                    size: 12, color: Colors.blue),
+                child: Icon(Icons.edit_rounded, size: 12, color: Colors.blue),
               ),
             ),
           ],
@@ -203,18 +214,21 @@ class AspirasiCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.white, Colors.grey.shade50],
+          colors: isDarkMode
+              ? [Colors.black.withOpacity(0.3), Colors.black.withOpacity(0.5)]
+              : [Colors.white, Colors.grey.shade50],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.05),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -247,22 +261,24 @@ class AspirasiCard extends StatelessWidget {
                     const SizedBox(width: 12),
                     StatusBadge(
                       status: aspirasi.status,
-                      showEditIcon: showUser && (aspirasi.status.toLowerCase() == 'pending'), // ✅ EDIT: Hanya siswa bisa edit status pending
+                      showEditIcon: showUser &&
+                          (aspirasi.status.toLowerCase() ==
+                              'pending'), // ✅ EDIT: Hanya siswa bisa edit status pending
                       onEditPressed: onEdit, // ✅ EDIT: Pass callback
                     ),
-                    
+
                     // ✅ TAMBAH: Popup menu untuk admin
                     if (showMenu) ...[
                       const SizedBox(width: 8),
                       PopupMenuButton<String>(
-                        icon: Icon(Icons.more_vert_rounded, 
+                        icon: Icon(Icons.more_vert_rounded,
                             color: AppColors.textSecondary.withOpacity(0.7)),
                         itemBuilder: (context) => [
                           PopupMenuItem<String>(
                             value: 'edit',
                             child: Row(
                               children: [
-                                Icon(Icons.edit_rounded, 
+                                Icon(Icons.edit_rounded,
                                     size: 20, color: AppColors.primary),
                                 const SizedBox(width: 8),
                                 const Text('Edit Umpan Balik'),
@@ -273,10 +289,11 @@ class AspirasiCard extends StatelessWidget {
                             value: 'delete',
                             child: Row(
                               children: [
-                                Icon(Icons.delete_rounded, 
+                                Icon(Icons.delete_rounded,
                                     size: 20, color: Colors.red),
                                 const SizedBox(width: 8),
-                                const Text('Hapus', style: TextStyle(color: Colors.red)),
+                                const Text('Hapus',
+                                    style: TextStyle(color: Colors.red)),
                               ],
                             ),
                           ),
@@ -296,23 +313,28 @@ class AspirasiCard extends StatelessWidget {
                 Row(
                   children: [
                     if (showUser) ...[
-                      Icon(Icons.person_rounded, size: 16, color: AppColors.textSecondary),
+                      Icon(Icons.person_rounded,
+                          size: 16, color: AppColors.textSecondary),
                       const SizedBox(width: 4),
                       Text(
                         '${aspirasi.nama} (${aspirasi.kelas})',
-                        style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                        style: TextStyle(
+                            fontSize: 13, color: AppColors.textSecondary),
                       ),
                       const SizedBox(width: 16),
                     ],
-                    Icon(Icons.calendar_today_rounded, size: 14, color: AppColors.textSecondary),
+                    Icon(Icons.calendar_today_rounded,
+                        size: 14, color: AppColors.textSecondary),
                     const SizedBox(width: 4),
                     Text(
                       Helpers.formatDate(aspirasi.tanggal),
-                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      style: TextStyle(
+                          fontSize: 12, color: AppColors.textSecondary),
                     ),
                     const Spacer(),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
                         color: AppColors.primary.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
@@ -339,24 +361,28 @@ class AspirasiCard extends StatelessWidget {
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (aspirasi.umpanBalik != null && aspirasi.umpanBalik!.isNotEmpty) ...[
+                if (aspirasi.umpanBalik != null &&
+                    aspirasi.umpanBalik!.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: AppColors.info.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.info.withOpacity(0.2)),
+                      border:
+                          Border.all(color: AppColors.info.withOpacity(0.2)),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.comment_rounded, size: 16, color: AppColors.info),
+                        const Icon(Icons.comment_rounded,
+                            size: 16, color: AppColors.info),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             aspirasi.umpanBalik!,
-                            style: const TextStyle(fontSize: 13, color: AppColors.info),
+                            style: const TextStyle(
+                                fontSize: 13, color: AppColors.info),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -385,7 +411,7 @@ class ModernAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        gradient: AppColors.primaryGradient,
+        gradient: DynamicAppColors.primaryGradient(context),
         boxShadow: [
           BoxShadow(
             color: AppColors.primary.withOpacity(0.3),
@@ -395,7 +421,9 @@ class ModernAppBar extends StatelessWidget implements PreferredSizeWidget {
         ],
       ),
       child: AppBar(
-        title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Text(title,
+            style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         actions: onLogout != null
             ? [
